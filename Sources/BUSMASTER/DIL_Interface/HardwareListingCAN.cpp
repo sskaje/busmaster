@@ -90,7 +90,9 @@ CHardwareListingCAN::CHardwareListingCAN( INTERFACE_HW* psIntrHw,
     : CDialog(CHardwareListingCAN::IDD, pParent),
       m_nSize( nSize ),
       m_nSelectedItem( -1)
-	  , m_omStrEditBaudRate(_T(""))	  
+	  , m_omStrEditBaudRate(_T(""))
+	  , m_omCANFDStrEditBaudRate(_T(""))
+	  , m_bCANFD(FALSE)
 {
     //{{AFX_DATA_INIT(CHardwareListingCAN)
     //}}AFX_DATA_INIT
@@ -104,7 +106,15 @@ CHardwareListingCAN::CHardwareListingCAN( INTERFACE_HW* psIntrHw,
 	m_pAdvChnlConfig = pAdvancedSetting;
 	m_pParent = pParent;
 	m_bDialogCancel    = FALSE;
-	
+	m_mapChannelToCANFDStatus.clear();
+	if (m_pControllerDetails != nullptr)
+	{
+		for (int i = 0; i < nSize; i++)
+		{
+			m_mapChannelToCANFDStatus[m_psHwInterface[i].m_acDescription] = m_pControllerDetails[i].m_bSupportCANFD;
+			m_pnCANDFDValue[i] = m_pControllerDetails[i].m_bSupportCANFD;
+		}
+	}
 }
 
 /*******************************************************************************
@@ -120,7 +130,7 @@ CHardwareListingCAN::CHardwareListingCAN( INTERFACE_HW* psIntrHw,
 CHardwareListingCAN::CHardwareListingCAN()
     : CDialog(CHardwareListingCAN::IDD, nullptr)
 	, m_omStrEditBaudRate(_T(""))
-	
+	, m_omCANFDStrEditBaudRate(_T(""))
 {
     // This dialog will not work with out enough constructor parameters
     // Refer previous constructor for the parameter list
@@ -148,7 +158,11 @@ void CHardwareListingCAN::DoDataExchange(CDataExchange* pDX)
     DDX_Control(pDX, IDC_LSTC_SELECTED_HW_LIST, m_omSelectedHwList);
     DDX_Control(pDX, IDC_EDIT_FIRMWARE, m_omFirmware);
 	DDX_Control(pDX,IDC_CAN_EDIT_BAUD_RATE, m_omEditBaudRate);
-	DDX_Text(pDX, IDC_CAN_EDIT_BAUD_RATE, m_omStrEditBaudRate);	
+	DDX_Text(pDX, IDC_CAN_EDIT_BAUD_RATE, m_omStrEditBaudRate);
+	DDX_Control(pDX, IDC_CANFD_EDIT_BAUD_RATE, m_omCANFDEditBaudRate);
+	DDX_Text(pDX, IDC_CANFD_EDIT_BAUD_RATE, m_omCANFDStrEditBaudRate);
+	DDX_Control(pDX, IDC_CHECK_CANFD, m_chkCANFD);
+	DDX_Check(pDX, IDC_CHECK_CANFD, m_bCANFD);
 	DDX_Control(pDX, IDC_EDIT_HS_BTR1, m_omEditBTR1);
 	DDX_Control(pDX, IDC_EDIT_HS_BTR0, m_omEditBTR0);
 	DDX_Text(pDX, IDC_EDIT_HS_BTR0, m_omStrEditBTR0);
@@ -167,11 +181,14 @@ BEGIN_MESSAGE_MAP(CHardwareListingCAN, CDialog)
     //}}AFX_MSG_MAP
     ON_NOTIFY(NM_CLICK, IDC_LSTC_HW_LIST, OnNMClickLstcHwList)
     ON_NOTIFY(NM_CLICK, IDC_LSTC_SELECTED_HW_LIST, OnNMClickLstcSelectedHwList)
-	ON_EN_KILLFOCUS(IDC_CAN_EDIT_BAUD_RATE, CHardwareListingCAN::OnEnKillfocusCanEditBaudRate)	
+	ON_EN_KILLFOCUS(IDC_CAN_EDIT_BAUD_RATE, CHardwareListingCAN::OnEnKillfocusCanEditBaudRate)
+	//ON_EN_KILLFOCUS(IDC_EDIT_HS_BTR0, CHardwareListingCAN::OnEnKillfocusCanEditBTR0)
+	//ON_EN_KILLFOCUS(IDC_EDIT_HS_BTR1, CHardwareListingCAN::OnEnKillfocusCanEditBTR1)
 	ON_BN_CLICKED(IDC_BUTTON_ADVANCE, CHardwareListingCAN::OnBnClickedButtonAdvance)
 	ON_NOTIFY(NM_DBLCLK, IDC_LSTC_HW_LIST, CHardwareListingCAN::OnNMDblclkLstcHwList)
 	ON_NOTIFY(NM_DBLCLK, IDC_LSTC_SELECTED_HW_LIST, CHardwareListingCAN::OnNMDblclkLstcSelectedHwList)
-	
+	ON_BN_CLICKED(IDC_CHECK_CANFD, CHardwareListingCAN::OnBnClickedCheckCanfd)
+	ON_EN_KILLFOCUS(IDC_CANFD_EDIT_BAUD_RATE, CHardwareListingCAN::OnEnKillfocusCanfdEditBaudRate)
 END_MESSAGE_MAP()
 
 BOOL CHardwareListingCAN::PreTranslateMessage(MSG* pMsg)
@@ -237,6 +254,9 @@ void CHardwareListingCAN::vCalculateConfigParams()
 	}
 	
 
+	/*m_pAdvChnlConfig->vCalculateConfigParams(omStrBaudRate);
+
+	m_pAdvChnlConfig->vUpdateControllerStructure(m_pControllerDetails);*/
 }
 
 /*******************************************************************************
@@ -354,7 +374,7 @@ BOOL CHardwareListingCAN::OnInitDialog()
     vSetHardwareList(m_psHwInterface, m_nSize);
 
 	CComboBox* pEditBaudRateCAN = (CComboBox*)GetDlgItem(IDC_CAN_EDIT_BAUD_RATE);
-	//CComboBox* pEditBaudRateCANFD = (CComboBox*)GetDlgItem(IDC_CANFD_EDIT_BAUD_RATE);
+	CComboBox* pEditBaudRateCANFD = (CComboBox*)GetDlgItem(IDC_CANFD_EDIT_BAUD_RATE);
 	CWnd* pChkCANFD = (CWnd*)GetDlgItem(IDC_CHECK_CANFD);
 	if(nullptr != pChkCANFD)
 	{
@@ -364,7 +384,10 @@ BOOL CHardwareListingCAN::OnInitDialog()
 	{
 		pEditBaudRateCAN ->EnableWindow(FALSE);
 	}
-
+	if(nullptr!=pEditBaudRateCANFD)
+	{
+		pEditBaudRateCANFD ->EnableWindow(FALSE);
+	}
 	if (m_pControllerDetails != nullptr)
 	{
 		for (int nIndex = 0; nIndex < m_nMaxChannelAllowed; nIndex++)
@@ -576,7 +599,20 @@ void CHardwareListingCAN::vMoveItemFromSelectedList()
 //Set the values over the UI
 		if (m_pControllerDetails != nullptr)
 		{
-			m_omEditBaudRate.SetWindowText(m_pControllerDetails[nSelectedItem].m_omStrBaudrate.c_str());			
+			m_omEditBaudRate.SetWindowText(m_pControllerDetails[nSelectedItem].m_omStrBaudrate.c_str());
+			
+			CString omCANFDDataBitRate;
+			m_chkCANFD.EnableWindow(m_pControllerDetails[nSelectedItem].m_bSupportCANFD);
+			m_chkCANFD.SetCheck(m_pControllerDetails[nSelectedItem].m_bcanFDEnabled);
+			CButton* pChkCANFD = (CButton*)GetDlgItem(IDC_CHECK_CANFD);
+			if (nullptr != pChkCANFD)
+			{
+				if (pChkCANFD->GetCheck() == BST_CHECKED)
+				{
+					omCANFDDataBitRate.Format("%u", m_pControllerDetails[nSelectedItem].m_unDataBitRate);
+					m_omCANFDEditBaudRate.SetWindowText(omCANFDDataBitRate);
+				}
+			}
 		}
 		UpdateData(TRUE);
         // Remove the item from the selected list
@@ -639,7 +675,7 @@ void CHardwareListingCAN::OnOK()
     {
 	//Checking for the Baud Rate entered either for CAN or CANFD
 		GetDlgItem(IDC_CAN_EDIT_BAUD_RATE)->GetWindowText(m_omStrEditBaudRate);
-		//GetDlgItem(IDC_CANFD_EDIT_BAUD_RATE)->GetWindowText(m_omCANFDStrEditBaudRate);
+		GetDlgItem(IDC_CANFD_EDIT_BAUD_RATE)->GetWindowText(m_omCANFDStrEditBaudRate);
 
 		for (int nIndex=0; nIndex < m_nNoOfHwSelected; nIndex++ )
     	{
@@ -647,7 +683,7 @@ void CHardwareListingCAN::OnOK()
 
         	{
 				CString omDummy = m_pControllerDetails[ nIndex ].m_omStrBaudrate.c_str();
-				if(omDummy.IsEmpty() || m_omStrEditBaudRate.IsEmpty()) 
+				if(omDummy.IsEmpty() || m_omStrEditBaudRate.IsEmpty()) //&& m_omCanfdStrEditBaudRate.IsEmpty()) //Checking whether the Combo box is empty
  
        			 {
 					AfxMessageBox("Please enter the Baud Rate");
@@ -841,7 +877,7 @@ void CHardwareListingCAN::OnItemchangedLstcSelectedHwList( NMHDR* pNMHDR,
 {
     //NM_LISTVIEW* pNMListView = (NM_LISTVIEW*)pNMHDR;
 	CComboBox* pEditBaudRateCAN = (CComboBox*)GetDlgItem(IDC_CAN_EDIT_BAUD_RATE);
-	//CComboBox* pEditBaudRateCANFD = (CComboBox*)GetDlgItem(IDC_CANFD_EDIT_BAUD_RATE);
+	CComboBox* pEditBaudRateCANFD = (CComboBox*)GetDlgItem(IDC_CANFD_EDIT_BAUD_RATE);
 	if(nullptr!=pEditBaudRateCAN )
 	{
 		pEditBaudRateCAN ->EnableWindow(TRUE);
@@ -857,12 +893,20 @@ void CHardwareListingCAN::OnItemchangedLstcSelectedHwList( NMHDR* pNMHDR,
 		m_nLastSelection = pNMListView->iItem;
         // Update selected Hw details
         vUpdateHwDetails( (INT)m_omSelectedHwList.GetItemData( nSelectedItem ) );		
+		std::string omSelectedItem = m_omSelectedHwList.GetItemText( nSelectedItem, 0);
+		std::map<std::string, bool>::iterator itr = m_mapChannelToCANFDStatus.find(omSelectedItem);
+		if(m_mapChannelToCANFDStatus.end() !=  itr)
+		{
+			m_chkCANFD.EnableWindow(itr->second);
+		}
 		vFillControllerConfigDetails();
     }
 	else if( pNMListView->uChanged  == LVIF_STATE &&
 		pNMListView->uOldState == LVIS_SELECTED )
 	{
 		UpdateData( TRUE );	
+		/*vValidateBaudRate();
+		vUpdateControllerDetails();*/
 	}
 	if(m_omSelectedHwList.GetSelectedCount() == 0)
 	{
@@ -870,9 +914,17 @@ void CHardwareListingCAN::OnItemchangedLstcSelectedHwList( NMHDR* pNMHDR,
 		{
 			pEditBaudRateCAN ->EnableWindow(FALSE);
 		}		
+		if(nullptr!=pEditBaudRateCANFD)
+		{
+			pEditBaudRateCANFD ->EnableWindow(FALSE);
+		}
 		vEnableBTRParams(FALSE);		
+		m_chkCANFD.SetCheck(BST_UNCHECKED);
+		m_chkCANFD.EnableWindow(FALSE);
 		m_omEditBaudRate.SetSel(0, -1);
 		m_omEditBaudRate.Clear();	
+		m_omCANFDEditBaudRate.SetSel(0, -1);
+		m_omCANFDEditBaudRate.Clear();
     }
     vEnableDisableButtons();
     *pResult = 0;
@@ -930,10 +982,43 @@ void CHardwareListingCAN::vSetSelectedList()
 			LVIS_SELECTED | LVIS_FOCUSED,
 			LVIS_SELECTED | LVIS_FOCUSED );
 		CComboBox* pEditBaudRateCAN = (CComboBox*)GetDlgItem(IDC_CAN_EDIT_BAUD_RATE);		
+		CComboBox* pEditBaudRateCANFD = (CComboBox*)GetDlgItem(IDC_CANFD_EDIT_BAUD_RATE);
 		if(nullptr!=pEditBaudRateCAN)
 		{
 			pEditBaudRateCAN ->EnableWindow(TRUE);
 		}	
+		CButton* pChkCANFD = (CButton*)GetDlgItem(IDC_CHECK_CANFD);
+		bool ulCANFDEnabled = 0;
+		if (m_pControllerDetails != nullptr)
+		{
+			ulCANFDEnabled = m_pControllerDetails[0].m_bcanFDEnabled;
+		}
+		std::string omSelectedItem = m_omSelectedHwList.GetItemText( 0, 0);
+		std::map<std::string, bool>::iterator itr = m_mapChannelToCANFDStatus.find(omSelectedItem);
+		if(m_mapChannelToCANFDStatus.end() !=  itr)
+		{
+			m_chkCANFD.EnableWindow(itr->second);
+		}
+		if(nullptr != pChkCANFD || nullptr != pEditBaudRateCANFD)
+		{
+			if(m_chkCANFD.IsWindowEnabled() == TRUE) // If Channel Supports CANFD
+			{
+				pChkCANFD->EnableWindow(TRUE);
+				if(ulCANFDEnabled == 1) //If User has Enabled CANFD Feature 
+				{
+					pChkCANFD->SetCheck(BST_CHECKED);
+					pEditBaudRateCANFD->EnableWindow(TRUE);
+				}
+				else
+				{
+					pChkCANFD->SetCheck(BST_UNCHECKED);
+				}
+			}
+			else
+			{
+				pChkCANFD->EnableWindow(FALSE);
+			}
+		}
 	}
 	else
 	{
@@ -1037,8 +1122,73 @@ void CHardwareListingCAN::vSortHardwareItems()
     mHardwareListMap.clear();
 }
 
+//void CHardwareListingCAN::OnEnKillfocusCanEditBTR0()
+//{
+//	CString strBTR0 = "", strBTR1 = "";
+//	GetDlgItem(IDC_EDIT_HS_BTR0)->GetWindowText(strBTR0);
+//	GetDlgItem(IDC_EDIT_HS_BTR1)->GetWindowText(strBTR1);
+//
+//	if (strBTR0.IsEmpty() == true)
+//	{
+//		if (-1 != m_nLastSelection)
+//		{
+//			GetDlgItem(IDC_EDIT_HS_BTR0)->SetWindowText(m_omStrBTR0Val);
+//		}
+//		return;
+//	}
+//
+//	if (strBTR0.GetLength() < 2)
+//	{
+//		strBTR0 = "0" + strBTR0;
+//	}
+//
+//	LONG fbaudRate = (LONG)CUtilFunctions::dCalculateBaudRateFromBTRs(strBTR0, strBTR1);
+//
+//	CString strBaudRate = "";
+//	strBaudRate.Format("%ld", fbaudRate);
+//
+//	GetDlgItem(IDC_CAN_EDIT_BAUD_RATE)->SetWindowText(strBaudRate);
+//	GetDlgItem(IDC_EDIT_HS_BTR0)->SetWindowText(strBTR0);
+//
+//	m_omStrBTR0Val = strBTR0;
+//	m_omStrBTR1Val = strBTR1;
+//}
+//
+//void CHardwareListingCAN::OnEnKillfocusCanEditBTR1()
+//{
+//	CString strBTR0 = "", strBTR1 = "";
+//	GetDlgItem(IDC_EDIT_HS_BTR0)->GetWindowText(strBTR0);
+//	GetDlgItem(IDC_EDIT_HS_BTR1)->GetWindowText(strBTR1);
+//
+//	if (strBTR1.IsEmpty() == true)
+//	{
+//		if (-1 != m_nLastSelection)
+//		{
+//			GetDlgItem(IDC_EDIT_HS_BTR1)->SetWindowText(m_omStrBTR1Val);
+//		}
+//		return;
+//	}
+//
+//	if (strBTR1.GetLength() < 2)
+//	{
+//		strBTR1 = "0" + strBTR1;
+//	}
+//
+//	LONG fbaudRate = (LONG)CUtilFunctions::dCalculateBaudRateFromBTRs(strBTR0, strBTR1);
+//
+//	CString strBaudRate = "";
+//	strBaudRate.Format("%ld", fbaudRate);
+//
+//	GetDlgItem(IDC_CAN_EDIT_BAUD_RATE)->SetWindowText(strBaudRate);
+//	GetDlgItem(IDC_EDIT_HS_BTR1)->SetWindowText(strBTR1);
+//
+//	m_omStrBTR0Val = strBTR0;
+//	m_omStrBTR1Val = strBTR1;
+//}
+
 void CHardwareListingCAN::OnEnKillfocusCanEditBaudRate()
 {	
+	//OnKillFocusOfEditBox(&m_omEditBaudRate,m_omStrEditBaudRate,0); //Validation on Kill Focus	
 	if (m_bOnEnterBaudRate == true)
 	{
 		return;
@@ -1056,6 +1206,29 @@ void CHardwareListingCAN::OnEnKillfocusCanEditBaudRate()
 			vCalculateConfigParams();
 		}
 	}	
+		
+	CButton* pomButtonCANFD = (CButton*) GetDlgItem(IDC_CHECK_CANFD);
+	CButton* pomButtonWnd = (CButton*) GetFocus();
+	if(nullptr != pomButtonCANFD)
+	{
+		if(TRUE == pomButtonCANFD->IsWindowEnabled())
+		{
+			/*UINT unButton = pomButtonCANFD->GetState();*/
+			if(nullptr != pomButtonWnd && nullptr != pomButtonCANFD && pomButtonCANFD == pomButtonWnd)
+			{
+				if(BST_CHECKED == m_chkCANFD.GetCheck())
+				{
+					m_chkCANFD.SetCheck(BST_UNCHECKED);
+					m_omCANFDEditBaudRate.EnableWindow(FALSE);
+				}
+				else
+				{
+					m_chkCANFD.SetCheck(BST_CHECKED);
+					m_omCANFDEditBaudRate.EnableWindow(TRUE);
+				}
+			}
+		}
+	}
 }
 void CHardwareListingCAN::vUpdateControllerDetails()
 { 
@@ -1068,6 +1241,35 @@ void CHardwareListingCAN::vUpdateControllerDetails()
 		GetDlgItem(IDC_EDIT_HS_BTR1)->GetWindowText(omStrBTR1);
 
 		m_pControllerDetails[m_nLastSelection].m_omStrBaudrate = omStrBaudRate;	
+
+		//m_pControllerDetails[m_nLastSelection].m_omStrBTR0 = omStrBTR0;
+		//m_pControllerDetails[m_nLastSelection].m_omStrBTR1 = omStrBTR1;
+		CButton* pChkCANFD = (CButton*)GetDlgItem(IDC_CHECK_CANFD);
+		if(nullptr != pChkCANFD)
+		{
+			if(TRUE == m_chkCANFD.IsWindowEnabled()) // If Channel Supports CANFD
+			{
+				if(pChkCANFD->GetCheck() == BST_CHECKED)
+				{
+					CString omCANFDStrEditDataRate;
+					m_omCANFDEditBaudRate.GetWindowText(omCANFDStrEditDataRate);
+					UINT32 ulCANFDDataRate = strtoul(omCANFDStrEditDataRate,NULL,0);
+					m_pControllerDetails[ m_nLastSelection ].m_unDataBitRate = ulCANFDDataRate;
+					m_pControllerDetails[m_nLastSelection].m_bcanFDEnabled = TRUE;
+					m_pControllerDetails[m_nLastSelection].m_bSupportCANFD = TRUE;
+				}
+				else
+				{
+					m_pControllerDetails[m_nLastSelection].m_bcanFDEnabled = FALSE;
+				}
+			}
+			else
+			{
+				pChkCANFD->EnableWindow(FALSE);
+				m_pControllerDetails[m_nLastSelection].m_bSupportCANFD = FALSE;
+				m_pControllerDetails[m_nLastSelection].m_bcanFDEnabled = FALSE;
+			}
+		}
 	}
 }
 void CHardwareListingCAN::vFillControllerConfigDetails()
@@ -1076,6 +1278,32 @@ void CHardwareListingCAN::vFillControllerConfigDetails()
 	if(nullptr!=m_pControllerDetails)
 	{
 		m_omStrEditBaudRate     = m_pControllerDetails[ nIndex ].m_omStrBaudrate.c_str();  
+    	unsigned long ulCANFDEnabled = m_pControllerDetails[nIndex].m_bcanFDEnabled;
+			if(m_chkCANFD.IsWindowEnabled() == TRUE) // If Channel Supports CANFD
+			{
+				m_chkCANFD.EnableWindow(TRUE);
+				if(ulCANFDEnabled == 1) //If User has Enabled CANFD Feature 
+				{
+					m_chkCANFD.SetCheck(BST_CHECKED);
+					UINT32 unDataBitrate = m_pControllerDetails[ nIndex ].m_unDataBitRate;
+					m_omCANFDStrEditBaudRate.Format("%u",unDataBitrate);
+					m_omCANFDEditBaudRate.EnableWindow(TRUE);
+					m_omCANFDEditBaudRate.SetWindowText(m_omCANFDStrEditBaudRate);
+				}
+				else
+				{
+					m_chkCANFD.SetCheck(BST_UNCHECKED);
+					m_omCANFDEditBaudRate.EnableWindow(FALSE);
+					m_omCANFDEditBaudRate.SetWindowText("");
+				}
+			}
+			else
+			{
+				m_chkCANFD.SetCheck(BST_UNCHECKED);
+				m_chkCANFD.EnableWindow(FALSE);
+				m_omCANFDEditBaudRate.EnableWindow(FALSE);
+				m_omCANFDEditBaudRate.SetWindowText("");
+			}
 	}
 	
 	GetDlgItem(IDC_CAN_EDIT_BAUD_RATE)->SetWindowText(m_omStrEditBaudRate);
@@ -1099,6 +1327,7 @@ void CHardwareListingCAN::OnBnClickedButtonAdvance()
 		for(int nIndex=0; nIndex<m_nNoOfHwSelected; nIndex++)
 		{
 			m_pControllerDetails[nIndex].m_omHardwareDesc = m_psHwInterface[m_anSelectedChannels[nIndex]].m_acDescription;			
+			m_pControllerDetails[nIndex].m_bSupportCANFD = m_pnCANDFDValue[m_anSelectedChannels[nIndex]];
 		}
 		POSITION sPos = m_omSelectedHwList.GetFirstSelectedItemPosition();
 		UINT nSelectedHw = -1;
@@ -1121,13 +1350,22 @@ void CHardwareListingCAN::OnBnClickedButtonAdvance()
 			m_pAdvChnlConfig->InvokeAdavancedSettings(m_pControllerDetails, m_nNoOfHwSelected, nSelectedHw);
 		}
 		
-		int nCount = nSelectedHw; 
+		int nCount = nSelectedHw; //m_omSelectedHwList.GetSelectionMark();
 		m_omEditBaudRate.SetWindowText(m_pControllerDetails[nCount].m_omStrBaudrate.c_str());
 		GetDlgItem(IDC_EDIT_HS_BTR0)->SetWindowText(m_pControllerDetails[nCount].m_omStrBTR0.c_str());
 		GetDlgItem(IDC_EDIT_HS_BTR1)->SetWindowText(m_pControllerDetails[nCount].m_omStrBTR1.c_str());
 		GetDlgItem(IDC_EDIT_HS_SAMPLE)->SetWindowText(m_pControllerDetails[nCount].m_omStrSampling.c_str());
 		GetDlgItem(IDC_EDIT_HS_CLOCK)->SetWindowText(m_pControllerDetails[nCount].m_omStrClock.c_str());
 		CString omstrCANFDDataBitRate;	
+		CButton* pChkCANFD = (CButton*)GetDlgItem(IDC_CHECK_CANFD);
+		if (nullptr != pChkCANFD)
+		{
+			if (pChkCANFD->GetCheck() == BST_CHECKED)
+			{
+				omstrCANFDDataBitRate.Format("%d", m_pControllerDetails[nCount].m_unDataBitRate);
+				m_omCANFDEditBaudRate.SetWindowText(omstrCANFDDataBitRate);
+			}
+		}
 	}
 }
 void CHardwareListingCAN::vValidateBaudRate()
@@ -1205,7 +1443,53 @@ int CHardwareListingCAN::nFillChannelDetails()
 	}
 	return S_OK;
 }
-
+void CHardwareListingCAN::OnBnClickedCheckCanfd()
+{
+	CComboBox* pEditBaudRateCANFD = (CComboBox*)GetDlgItem(IDC_CANFD_EDIT_BAUD_RATE);
+	std::string omSelectedItem = m_omSelectedHwList.GetItemText( m_nLastSelection, 0);
+	std::map<std::string, bool>::iterator itr = m_mapChannelToCANFDStatus.find(omSelectedItem);
+	if(m_mapChannelToCANFDStatus.end() !=  itr)
+	{
+		m_chkCANFD.EnableWindow(itr->second);
+	}
+	if(m_chkCANFD.IsWindowEnabled() == TRUE)
+	{
+		if(m_chkCANFD.GetCheck() == BST_CHECKED)
+		{
+			if(nullptr!=pEditBaudRateCANFD)
+			{
+				pEditBaudRateCANFD ->EnableWindow(TRUE);
+				UINT32 unDataBitRate  = 2000000; //Set it to Default DataBitRate
+				m_omCANFDStrEditBaudRate.Format("%u",unDataBitRate);
+				m_omCANFDEditBaudRate.SetWindowText(m_omCANFDStrEditBaudRate);
+				m_pControllerDetails[m_nLastSelection].m_bcanFDEnabled = TRUE;
+			}
+		}
+		else
+		{
+			if(nullptr!=pEditBaudRateCANFD)
+			{
+				pEditBaudRateCANFD ->EnableWindow(FALSE);
+				m_omCANFDEditBaudRate.SetWindowText("");
+			}
+			m_pControllerDetails[m_nLastSelection].m_bcanFDEnabled = FALSE;
+		}
+	}
+}
+void CHardwareListingCAN::OnEnKillfocusCanfdEditBaudRate()
+{
+	OnKillFocusOfEditBox(&m_omCANFDEditBaudRate,m_omCANFDStrEditBaudRate ,1); //Validation on Kill Focus 
+	CButton* pomButtonCANFD = (CButton*) GetDlgItem(IDC_CHECK_CANFD);
+	if(pomButtonCANFD != nullptr)
+	{
+		UINT unButton = pomButtonCANFD->GetState();
+		if(1 != unButton )
+		{
+			m_chkCANFD.SetCheck(BST_UNCHECKED);
+			m_omCANFDEditBaudRate.EnableWindow(FALSE);
+		}
+	}
+}
 void CHardwareListingCAN::OnKillFocusOfEditBox(CEdit* omEditBaudRate, CString omStrEditBaudRate,bool bchkCANFD)
 {
 	CString omStrBaudRate   ="";
@@ -1229,7 +1513,11 @@ void CHardwareListingCAN::OnKillFocusOfEditBox(CEdit* omEditBaudRate, CString om
 			{
 				// Validate for empty string and if zero value is entered.
 				DOUBLE dBaudRate = (FLOAT) _tstof(omStrBaudRate);
-				if(bchkCANFD == 1)
+				/*if(bchkCANFD == 0)
+				{
+					ValidationOfKillFocus(omEditBaudRate, omStrEditBaudRate, bchkCANFD,1000000);
+				}
+				else*/ if(bchkCANFD == 1)
 				{
 					ValidationOfKillFocus(omEditBaudRate, omStrEditBaudRate, bchkCANFD,8000000);
 				}

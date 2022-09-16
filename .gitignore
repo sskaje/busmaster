@@ -369,3 +369,30 @@ Tests/PMD/cpd.html
 Tests/PMD/cpd.xml
 Tests/PMD/cpd-fixed.xml
 Tests/Requirements Traceability Matrix/report.html
+
+
+# Out Files
+Sources/BUSMASTER/out/**
+Sources/Kernel/BusmasterDriverInterface/DIL_J1939/out/**
+Sources/BUSMASTER/Language Dlls/JPN/*/Debug/
+Sources/BUSMASTER/Language Dlls/JPN/*/Release/
+Sources/BUSMASTER/BIN/Libs/Debug/*.exp
+Sources/BUSMASTER/BIN/Libs/Debug/*.lib
+Sources/BUSMASTER/BIN/Libs/Release/*.exp
+Sources/BUSMASTER/BIN/Libs/Release/*.lib
+BUSMASTER/Format Converter/*/Debug/
+BUSMASTER/Format Converter/*/Release/
+Sources/BUSMASTER/*/Debug/
+Sources/BUSMASTER/*/Release/
+
+Sources/Kernel/Bin/
+Sources/Kernel/BusmasterDBNetwork/Debug/
+Sources/Kernel/BusmasterDBNetwork/Release/
+Sources/Kernel/BusmasterDriverInterface/DIL_J1939/Debug/
+Sources/Kernel/BusmasterDriverInterface/DIL_J1939/Release/
+Sources/Kernel/BusmasterDriverInterface/Debug/
+Sources/Kernel/BusmasterDriverInterface/Release/
+Sources/Kernel/BusmasterKernel/Debug/
+Sources/Kernel/BusmasterKernel/Release/
+Sources/Kernel/Utilities/Debug/
+Sources/Kernel/Utilities/Release/

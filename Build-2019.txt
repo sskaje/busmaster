@@ -1,0 +1,3 @@
+1 VS2019 + Win32 Tested, QT=C:\Qt\Qt5.12.12\5.12.12\msvc2017
+2 Start with VS2019 x86 CLI, chdir to Sources, run build.bat.
+3 Register BusEmulation.exe with UAC, command `BusEmulation.exe -regserver`
