@@ -24,6 +24,10 @@ REM set PATH=%DOTNET%;%PATH%
 MSBuild "Kernel\BusmasterKernel.sln" /maxCpuCount:%MAXCPUCOUNT% /property:Configuration=%CONFIGURATION% /p:VisualStudioVersion=%VISUALSTUDIOVERSION% /p:Platform=%PLATFORM%
 MSBuild "BUSMASTER\BUSMASTER.sln" /maxCpuCount:%MAXCPUCOUNT% /property:Configuration=%CONFIGURATION% /p:VisualStudioVersion=%VISUALSTUDIOVERSION% /p:Platform=%PLATFORM%
 
+set CLASSPATH=antlr-3.5.3-complete.jar
+
+MSBuild "BUSMASTER\DBManager\DBManager.vcxproj" /maxCpuCount:%MAXCPUCOUNT% /property:Configuration=%CONFIGURATION% /p:VisualStudioVersion=%VISUALSTUDIOVERSION% /p:Platform=%PLATFORM%
+
 REM CAN PEAK USB.
 REM MSBuild "BUSMASTER\CAN_PEAK_USB\CAN_PEAK_USB.vcxproj" /maxCpuCount:%MAXCPUCOUNT% /property:Configuration=%CONFIGURATION% /p:VisualStudioVersion=%VISUALSTUDIOVERSION% /p:Platform=%PLATFORM%
 

@@ -66,11 +66,11 @@ Sources/Format Converter/LogAscConverter/log_asc_parser.h
 Sources/TestSuiteExecutorGUI/lexer.c
 Sources/TestSuiteExecutorGUI/parser.c
 Sources/TestSuiteExecutorGUI/parser.h
-Sources/DBManager/LDFGrammerLexer.cpp
-Sources/DBManager/LDFGrammerLexer.hpp
-Sources/DBManager/LDFGrammerParser.cpp
-Sources/DBManager/LDFGrammerParser.hpp
-Sources/DBManager/ANTLR3/include
+Sources/BUSMASTER/DBManager/LDFGrammerLexer.cpp
+Sources/BUSMASTER/DBManager/LDFGrammerLexer.hpp
+Sources/BUSMASTER/DBManager/LDFGrammerParser.cpp
+Sources/BUSMASTER/DBManager/LDFGrammerParser.hpp
+Sources/BUSMASTER/DBManager/ANTLR3/include
 
 # Release dirs (except BIN)
 Sources/Application/Release

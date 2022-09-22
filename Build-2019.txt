@@ -1,3 +1,8 @@
 1 VS2019 + Win32 Tested, QT=C:\Qt\Qt5.12.12\5.12.12\msvc2017
+
+2 ANTLR3:
+  2.1 Download complete Source from https://www.antlr3.org/download.html, mkdir `Sources\BUSMASTER\DBManager\ANTLR3`, extract runtime\Cpp\include to Sources\BUSMASTER\DBManager\ANTLR3\include.
+  2.2 Download jar binary from https://www.antlr3.org/download.html, copy to `Sources\antlr-3.5.3-complete.jar`
+
 2 Start with VS2019 x86 CLI, chdir to Sources, run build.bat.
 3 Register BusEmulation.exe with UAC, command `BusEmulation.exe -regserver`
